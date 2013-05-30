@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>StackEdit - Markdown editor</title>
+<link rel="icon" href="img/stackedit-32.ico" type="image/x-icon">
+<link rel="shortcut icon" href="img/stackedit-32.ico"
+    type="image/x-icon">
+<meta name="description"
+    content="StackEdit is a free, open-source Markdown editor based on PageDown, the Markdown library used by Stack Overflow and the other Stack Exchange sites.">
+<meta name="author" content="Benoit Schweblin">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="msvalidate.01" content="5E47EE6F67B069C17E3CDD418351A612" />
+<script>
+    // Use http://.../?debug to serve original CSS/JavaScript files instead of minified
+    var suffix = "";
+    if (!location.search.match(/(\?|&)debug/)) {
+        suffix = "-min";
+    }
+    document.write('<link href="css/main' + suffix + '.css" rel="stylesheet">');
+    var theme = localStorage.theme;
+    if (theme) {
+        document.write('<link href="themes/' + theme + '/' + theme + '.css" rel="stylesheet">');
+    }
+    var require = { baseUrl : "js", deps : [ "main" + suffix ] };
+    var viewerMode = false;
+</script>
+<script src="js/lib/require.js"></script>
+</head>
+<body>
+    <div id="navbar" class="navbar navbar-fixed-top ui-layout-north">
+        <div class="navbar-inner">
+
+            <ul class="nav">
+                <li><div id="wmd-button-bar"></div></li>
+            </ul>
+            <ul class="nav pull-right hide" id="menu-bar">
+                <li class="btn-group"><button class="btn dropdown-toggle"
+                        data-toggle="dropdown" title="Menu">
+                        <i class="icon-stackedit"></i>&nbsp;&nbsp;<b class="caret"></b>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-toggle="modal"
+                            data-target="#modal-settings" class="action-load-settings"><i
+                                class="icon-cog"></i> 设置</a></li>
+                        <li><a href="#" data-toggle="modal"
+                            data-target="#modal-about"><i class="icon-question-sign"></i>
+                                关于</a></li>
+                    </ul></li>
+            </ul>
+
+        </div>
+    </div>
+    <textarea id="wmd-input" class="ui-layout-center hide"></textarea>
+    <div class="ui-layout-east hide"></div>
+    <div class="ui-layout-south hide"></div>
+
+    <div id="modal-insert-link" class="modal hide">
+        <div class="modal-header">
+            <button type="button" class="close action-close-insert-link"
+                data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3>插入链接</h3>
+        </div>
+        <div class="modal-body">
+            <p>链接格式 链接地址 "说明文字:</p>
+            <div class="input-prepend">
+                <span class="add-on"><i class="icon-globe"></i></span><input
+                    id="input-insert-link" type="text" class="span5"
+                    placeholder='http://eoe.cn/ "最大的移动开发者社区"'></input>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#" class="btn action-close-insert-link" data-dismiss="modal">取消(Esc)</a>
+            <a href="#" class="btn btn-primary action-insert-link"
+                data-dismiss="modal">OK</a>
+        </div>
+    </div>
+
+    <div id="modal-insert-image" class="modal hide">
+        <div class="modal-header">
+            <button type="button" class="close action-close-insert-link"
+                data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3>插入图片</h3>
+        </div>
+        <div class="modal-body">
+            <p>图片格式 图片链接 "说明文字:</p>
+            <div class="input-prepend">
+                <span class="add-on"><i class="icon-picture"></i></span><input
+                    id="input-insert-image" type="text" class="span5"
+                    placeholder='http://example.com/girls.jpg "我的妹子"'></input>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#" class="btn action-close-insert-link" data-dismiss="modal">取消(Esc)</a>
+            <a href="#" class="btn btn-primary action-insert-image"
+                data-dismiss="modal">OK</a>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal hide">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"
+                aria-hidden="true">&times;</button>
+            <h3>设置</h3>
+        </div>
+        <div class="modal-body">
+            <ul class="nav nav-tabs">
+                <li class="active"><a class="action-load-settings"
+                    href="#tabpane-settings-editor" data-toggle="tab">编辑器设置</a></li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane active" id="tabpane-settings-editor">
+                    <div class="form-horizontal">
+                        <div class="control-group">
+                            <div class="control-label">编辑器方向</div>
+                            <div class="controls">
+                                <label class="radio"> <input type="radio"
+                                    name="radio-layout-orientation" value="horizontal">
+                                    垂直分屏
+                                </label> <label class="radio"> <input type="radio"
+                                    name="radio-layout-orientation" value="vertical">
+                                    水平分屏
+                                </label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="input-settings-theme">页面风格</label>
+                            <div class="controls">
+                                <select id="input-settings-theme">
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="input-settings-lazy-rendering">延时预览
+                            <a href="#" class="tooltip-lazy-rendering">(?)</a>
+                            </label>
+                            <div class="controls">
+                                <input type="checkbox" id="input-settings-lazy-rendering" />
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label"
+                                for="input-settings-editor-font-size">编辑器字体</label>
+                            <div class="controls">
+                                <input type="text" id="input-settings-editor-font-size"
+                                    class="input-mini"><span class="help-inline">px</span>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label"
+                                for="textarea-settings-default-content">博客模板
+                                <a href="#" class="tooltip-default-content">(?)</a>
+                            </label>
+                            <div class="controls">
+                                <textarea id="textarea-settings-default-content"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="tabpane-settings-publish">
+                    <div class="form-horizontal">
+                        <div class="control-group">
+                            <label class="control-label"
+                                for="input-settings-publish-commit-msg">发表注释</label>
+                            <div class="controls">
+                                <input type="text" id="input-settings-publish-commit-msg">
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label"
+                                for="textarea-settings-publish-template">模板 <a
+                                href="#" class="tooltip-template">(?)</a>
+                            </label>
+                            <div class="controls">
+                                <textarea id="textarea-settings-publish-template"></textarea>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="input-settings-ssh-proxy">SSH
+                                proxy</label>
+                            <div class="controls">
+                                <input type="text" id="input-settings-ssh-proxy">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="tabpane-settings-extensions">
+                    <div class="accordion" id="accordion-extensions"></div>
+                    <span class="help-block pull-right"><a target="_blank"
+                        href="https://github.com/benweet/stackedit/blob/master/doc/developer-guide.md#architecture">Create
+                            your own extension...</a></span>
+                </div>
+                <div class="tab-pane" id="tabpane-settings-utils">
+                    <div style="width: 200px; margin: 10px auto;">
+                        <a href="#" class="btn btn-block btn-primary action-welcome-file"
+                            data-dismiss="modal">未命名</a> <a href="#"
+                            class="btn btn-block btn-primary action-default-settings"
+                            data-dismiss="modal">恢复默认设置</a> <a href="#"
+                            class="btn btn-block btn-primary" data-dismiss="modal"
+                            data-toggle="modal" data-target="#modal-app-reset">恢复</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <a href="#" class="btn" data-dismiss="modal">关闭</a> <a href="#"
+                class="btn btn-primary action-apply-settings" data-dismiss="modal">OK</a>
+        </div>
+    </div>
+
+    <div id="modal-about" class="modal hide">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"
+                aria-hidden="true">&times;</button>
+            <img src="img/stackedit-promo.png" />
+        </div>
+        <div class="modal-body">
+            <dl>
+                <dt>eoe移动开发者社区的编辑器使用基于markdown的stackedit，致谢．</dt>
+                <dd>
+                    <a target="_blank" href="https://github.com/benweet/stackedit/">stackedit @ GitHub</a>
+                </dd>
+            </dl>
+        </div>
+        <div class="modal-footer">
+            <a href="#" class="btn btn-primary" data-dismiss="modal">Close</a>
+        </div>
+    </div>
+
+    <div id="modal-non-unique" class="modal hide">
+        <div class="modal-header">
+            <h3>出错了...</h3>
+        </div>
+        <div class="modal-body">
+            <p>StackEdit 不支持同时打开浏辑器窗口，请关闭其它的发布页面.</p>
+            <blockquote class="muted">您可以刷新页面来恢复页面</blockquote>
+        </div>
+        <div class="modal-footer">
+            <a href="javascript:window.location.reload();"
+                class="btn btn-primary">刷新(F5)</a>
+        </div>
+    </div>
+
+    <div id="modal-app-reset" class="modal hide">
+        <div class="modal-header">
+            <h3>重设内容</h3>
+        </div>
+        <div class="modal-body">
+            <p>这样会清空所有记录.</p>
+            <blockquote class="muted">您要继续吗?</blockquote>
+        </div>
+        <div class="modal-footer">
+            <a href="#" class="btn" data-dismiss="modal">Cancel</a> <a href="#"
+                class="btn btn-primary action-app-reset" data-dismiss="modal">OK</a>
+        </div>
+    </div>
+
+    <textarea id="md-section-helper"></textarea>
+    <div id="dropboxjs" data-app-key="x0k2l8puemfvg0o"></div>
+
+</body>
+</html>
