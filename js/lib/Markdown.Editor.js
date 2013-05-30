@@ -53,7 +53,42 @@
 
         help: "Markdown Editing Help"
     };
+    var EOE_EDITOR_CONFIG = {
+            bold: "加粗 <strong> Ctrl+B",
+            boldexample: "加粗内容",
 
+            italic: "斜体 <em> Ctrl+I",
+            italicexample: "斜体内容",
+
+            link: "链接 <a> Ctrl+L",
+            linkdescription: "链接说明文字",
+            linkdialog: "<p><b>插入链接地址</b></p><p>http://baidu.com/ \"百度一下\"</p>",
+
+            quote: "引用 <blockquote> Ctrl+Q",
+            quoteexample: "引用内容",
+
+            code: "代码块 <pre><code> Ctrl+K",
+            codeexample: "代码块",
+
+            image: "图片 <img> Ctrl+G",
+            imagedescription: "图片说明文字",
+            imagedialog: "<p><b>插入图片地址</b></p><p>http://baidu.com/logo.jpg \"百度一下\"",
+
+            olist: "有序列表 <ol> Ctrl+O",
+            ulist: "无序列表 <ul> Ctrl+U",
+            litem: "列表项",
+
+            heading: "标题节点 <h1>/<h2> Ctrl+H",
+            headingexample: "标题节点",
+
+            hr: "横线 <hr> Ctrl+R",
+
+            undo: "撤销 - Ctrl+Z",
+            redo: "重做 - Ctrl+Y",
+            redomac: "重做 - Ctrl+Shift+Z",
+
+            help: "编辑器帮助"
+        };
 
     // -------------------------------------------------------------------
     //  YOUR CHANGES GO HERE
@@ -100,7 +135,7 @@
         if (options.helpButton) {
             options.strings.help = options.strings.help || options.helpButton.title;
         }
-        var getString = function (identifier) { return options.strings[identifier] || defaultsStrings[identifier]; }
+        var getString = function (identifier) { return options.strings[identifier] || EOE_EDITOR_CONFIG[identifier]; }
 
         idPostfix = idPostfix || "";
 

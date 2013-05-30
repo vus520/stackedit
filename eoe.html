@@ -3,10 +3,9 @@
 <head>
 <title>StackEdit - Markdown editor</title>
 <link rel="icon" href="img/stackedit-32.ico" type="image/x-icon">
-<link rel="shortcut icon" href="img/stackedit-32.ico"
-    type="image/x-icon">
-<meta name="description"
-    content="StackEdit is a free, open-source Markdown editor based on PageDown, the Markdown library used by Stack Overflow and the other Stack Exchange sites.">
+<link rel="shortcut icon" href="img/stackedit-32.ico" type="image/x-icon">
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<meta name="description" content="">
 <meta name="author" content="Benoit Schweblin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="msvalidate.01" content="5E47EE6F67B069C17E3CDD418351A612" />
@@ -29,23 +28,19 @@
 <body>
     <div id="navbar" class="navbar navbar-fixed-top ui-layout-north">
         <div class="navbar-inner">
-
             <ul class="nav">
                 <li><div id="wmd-button-bar"></div></li>
             </ul>
             <ul class="nav pull-right hide" id="menu-bar">
-                <li class="btn-group"><button class="btn dropdown-toggle"
-                        data-toggle="dropdown" title="Menu">
+                <li class="btn-group">
+                	<button class="btn dropdown-toggle" data-toggle="dropdown" title="Menu">
                         <i class="icon-stackedit"></i>&nbsp;&nbsp;<b class="caret"></b>
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a href="#" data-toggle="modal"
-                            data-target="#modal-settings" class="action-load-settings"><i
-                                class="icon-cog"></i> 设置</a></li>
-                        <li><a href="#" data-toggle="modal"
-                            data-target="#modal-about"><i class="icon-question-sign"></i>
-                                关于</a></li>
-                    </ul></li>
+                        <li><a href="#" data-toggle="modal" data-target="#modal-settings" class="action-load-settings"><i class="icon-cog"></i> 设置</a></li>
+                        <li><a href="#" data-toggle="modal" data-target="#modal-about"><i class="icon-question-sign"></i> 关于</a></li>
+                    </ul>
+				</li>
             </ul>
 
         </div>
@@ -112,7 +107,7 @@
                 <div class="tab-pane active" id="tabpane-settings-editor">
                     <div class="form-horizontal">
                         <div class="control-group">
-                            <div class="control-label">编辑器方向</div>
+                            <div class="control-label">编辑框方向</div>
                             <div class="controls">
                                 <label class="radio"> <input type="radio"
                                     name="radio-layout-orientation" value="horizontal">
@@ -257,7 +252,6 @@
     </div>
 
     <textarea id="md-section-helper"></textarea>
-    <div id="dropboxjs" data-app-key="x0k2l8puemfvg0o"></div>
 
 </body>
 </html>
