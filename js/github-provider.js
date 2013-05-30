@@ -1,28 +1,35 @@
-define(["jquery", "core", "github-helper"], function($, core, githubHelper) {
-	
-	var PROVIDER_GITHUB = "github";
-	
-	var githubProvider = {
-		providerId: PROVIDER_GITHUB,
-		providerName: "GitHub"
-	};
-	
-	githubProvider.publish = function(publishAttributes, title, content, callback) {
-		var commitMsg = core.settings.commitMsg;
-		githubHelper.upload(publishAttributes.repository, publishAttributes.branch,
-			publishAttributes.path, content, commitMsg, callback);
-	};
+define([
+    "utils",
+    "settings",
+    "github-helper"
+], function(utils, settings, githubHelper) {
 
-	githubProvider.newPublishAttributes = function(event) {
-		var publishAttributes = {};
-		publishAttributes.repository = core.getInputValue($("#input-publish-github-reponame"), event);
-		publishAttributes.branch = core.getInputValue($("#input-publish-github-branch"), event);
-		publishAttributes.path = core.getInputValue($("#input-publish-github-path"), event);
-		if(event.isPropagationStopped()) {
-			return undefined;
-		}
-		return publishAttributes;
-	};
+    var PROVIDER_GITHUB = "github";
 
-	return githubProvider;
+    var githubProvider = {
+        providerId: PROVIDER_GITHUB,
+        providerName: "GitHub",
+        publishPreferencesInputIds: [
+            "github-reponame",
+            "github-branch"
+        ]
+    };
+
+    githubProvider.publish = function(publishAttributes, title, content, callback) {
+        var commitMsg = settings.commitMsg;
+        githubHelper.upload(publishAttributes.repository, publishAttributes.branch, publishAttributes.path, content, commitMsg, callback);
+    };
+
+    githubProvider.newPublishAttributes = function(event) {
+        var publishAttributes = {};
+        publishAttributes.repository = utils.getInputTextValue("#input-publish-github-reponame", event);
+        publishAttributes.branch = utils.getInputTextValue("#input-publish-github-branch", event);
+        publishAttributes.path = utils.getInputTextValue("#input-publish-file-path", event);
+        if(event.isPropagationStopped()) {
+            return undefined;
+        }
+        return publishAttributes;
+    };
+
+    return githubProvider;
 });

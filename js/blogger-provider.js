@@ -1,53 +1,51 @@
-define(["jquery", "core", "google-helper"], function($, core, googleHelper) {
-	
-	var PROVIDER_BLOGGER = "blogger";
+define([
+    "underscore",
+    "utils",
+    "google-helper"
+], function(_, utils, googleHelper) {
 
-	var bloggerProvider = {
-		providerId: PROVIDER_BLOGGER,
-		providerName: "Blogger",
-		defaultPublishFormat: "html"
-	};
-	
-	bloggerProvider.publish = function(publishAttributes, title, content, callback) {
-		googleHelper.uploadBlogger(
-			publishAttributes.blogUrl,
-			publishAttributes.blogId,
-			publishAttributes.postId,
-			publishAttributes.labelList,
-			title,
-			content,
-			function(error, blogId, postId) {
-				if(error) {
-					callback(error);
-					return;
-				}
-				publishAttributes.blogId = blogId;
-				publishAttributes.postId = postId;
-				callback();
-			}
-		);
-	};
-	
-	bloggerProvider.newPublishAttributes = function(event) {
-		var publishAttributes = {};
-		var blogUrl = core.getInputValue($("#input-publish-blogger-url"), event);
-		if(blogUrl !== undefined) {
-			publishAttributes.blogUrl = core.checkUrl(blogUrl);
-		}
-		publishAttributes.postId = $("#input-publish-postid").val() || undefined;
-		publishAttributes.labelList = [];
-		var labels = $("#input-publish-labels").val() || undefined;
-		if(labels !== undefined) {
-			publishAttributes.labelList = _.chain(labels.split(","))
-				.map(function(label) {
-					return core.trim(label);
-				}).compact().value();
-		} 
-		if(event.isPropagationStopped()) {
-			return undefined;
-		}
-		return publishAttributes;
-	};
+    var PROVIDER_BLOGGER = "blogger";
 
-	return bloggerProvider;
+    var bloggerProvider = {
+        providerId: PROVIDER_BLOGGER,
+        providerName: "Blogger",
+        defaultPublishFormat: "html",
+        publishPreferencesInputIds: [
+            "blogger-url"
+        ]
+    };
+
+    bloggerProvider.publish = function(publishAttributes, title, content, callback) {
+        googleHelper.uploadBlogger(publishAttributes.blogUrl, publishAttributes.blogId, publishAttributes.postId, publishAttributes.labelList, title, content, function(error, blogId, postId) {
+            if(error) {
+                callback(error);
+                return;
+            }
+            publishAttributes.blogId = blogId;
+            publishAttributes.postId = postId;
+            callback();
+        });
+    };
+
+    bloggerProvider.newPublishAttributes = function(event) {
+        var publishAttributes = {};
+        var blogUrl = utils.getInputTextValue("#input-publish-blogger-url", event);
+        if(blogUrl !== undefined) {
+            publishAttributes.blogUrl = utils.checkUrl(blogUrl);
+        }
+        publishAttributes.postId = utils.getInputTextValue("#input-publish-postid");
+        publishAttributes.labelList = [];
+        var labels = utils.getInputTextValue("#input-publish-labels");
+        if(labels !== undefined) {
+            publishAttributes.labelList = _.chain(labels.split(",")).map(function(label) {
+                return utils.trim(label);
+            }).compact().value();
+        }
+        if(event.isPropagationStopped()) {
+            return undefined;
+        }
+        return publishAttributes;
+    };
+
+    return bloggerProvider;
 });

@@ -1,317 +1,323 @@
-define(["jquery", "core", "synchronizer", "publisher", "sharing", "text!../WELCOME.md", "underscore"],
-	function($, core, synchronizer, publisher, sharing, welcomeContent) {
-	
-	var TEMPORARY_FILE_INDEX = "file.tempIndex";
+define([
+    "jquery",
+    "underscore",
+    "core",
+    "utils",
+    "settings",
+    "extension-manager",
+    "file-system",
+    "lib/text!../WELCOME.md"
+], function($, _, core, utils, settings, extensionMgr, fileSystem, welcomeContent) {
 
-	var fileManager = {};
+    var fileMgr = {};
 
-	// Defines the current file
-	var currentFileIndex = localStorage["file.current"];
-	fileManager.getCurrentFileIndex = function() {
-		return currentFileIndex;
-	};
-	fileManager.isCurrentFileIndex = function(fileIndex) {
-		return fileIndex == currentFileIndex;
-	};
-	fileManager.setCurrentFileIndex = function(fileIndex) {
-		currentFileIndex = fileIndex;
-		if(fileIndex === undefined) {
-			localStorage.removeItem("file.current");
-		}
-		else if(fileIndex != TEMPORARY_FILE_INDEX) {
-			localStorage["file.current"] = fileIndex;
-		}
-	};
-	
-	// Caution: this function recreate the editor (reset undo operations)
-	var fileDescList = [];
-	fileManager.selectFile = function(fileIndex) {
-		// If no file create one
-		if (localStorage["file.list"].length === 1) {
-			fileIndex = fileManager.createFile(WELCOME_DOCUMENT_TITLE, welcomeContent);
-		}
-		
-		if(fileIndex !== undefined) {
-			fileManager.setCurrentFileIndex(fileIndex);
-		}
+    // Defines a file descriptor in the file system (fileDesc objects)
+    function FileDescriptor(fileIndex, title, syncLocations, publishLocations) {
+        this.fileIndex = fileIndex;
+        this._title = title;
+        this.__defineGetter__("title", function() {
+            return this._title;
+        });
+        this.__defineSetter__("title", function(title) {
+            this._title = title;
+            localStorage[this.fileIndex + ".title"] = title;
+            extensionMgr.onTitleChanged(this);
+        });
+        this.__defineGetter__("content", function() {
+            return localStorage[this.fileIndex + ".content"];
+        });
+        this.__defineSetter__("content", function(content) {
+            localStorage[this.fileIndex + ".content"] = content;
+            extensionMgr.onContentChanged(this);
+        });
+        this.syncLocations = syncLocations || {};
+        this.publishLocations = publishLocations || {};
+    }
 
-		// Update the file titles
-		fileManager.updateFileTitles();
-		synchronizer.refreshManageSync();
-		publisher.notifyPublish();
-		
-		// Hide the viewer pencil button
-		if(fileIndex == TEMPORARY_FILE_INDEX) {
-			$(".action-edit-document").removeClass("hide");
-		}
-		else {
-			$(".action-edit-document").addClass("hide");
-		}
-		
-		// Recreate the editor
-		fileIndex = fileManager.getCurrentFileIndex();
-		$("#wmd-input").val(localStorage[fileIndex + ".content"]);
-		core.createEditor(function() {
-			fileManager.saveFile();
-		});
-	};
+    // Load file descriptors from localStorage
+    _.chain(localStorage["file.list"].split(";")).compact().each(function(fileIndex) {
+        fileSystem[fileIndex] = new FileDescriptor(fileIndex, localStorage[fileIndex + ".title"]);
+    });
 
-	fileManager.createFile = function(title, content, syncIndexes, isTemporary) {
-		content = content || core.settings.defaultContent;
-		syncIndexes = syncIndexes || [];
-		if (!title) {
-			// Create a file title 
-			title = DEFAULT_FILE_TITLE;
-			var indicator = 2;
-			while(_.some(fileDescList, function(fileDesc) {
-				return fileDesc.title == title;
-			})) {
-				title = DEFAULT_FILE_TITLE + indicator++;
-			}
-		}
-		
-		// Generate a unique fileIndex
-		var fileIndex = TEMPORARY_FILE_INDEX;
-		if(!isTemporary) {
-			do {
-				fileIndex = "file." + core.randomString();
-			} while(_.has(localStorage, fileIndex + ".title"));
-		}
-		
-		// Create the file in the localStorage
-		localStorage[fileIndex + ".content"] = content;
-		localStorage[fileIndex + ".title"] = title;
-		var sync = _.reduce(syncIndexes, function(sync, syncIndex) {
-			return sync + syncIndex + ";";
-		}, ";");
-		localStorage[fileIndex + ".sync"] = sync;
-		localStorage[fileIndex + ".publish"] = ";";
-		if(!isTemporary) {
-			localStorage["file.list"] += fileIndex + ";";
-		}
-		return fileIndex;
-	};
+    // Defines the current file
+    var currentFile = undefined;
+    fileMgr.getCurrentFile = function() {
+        return currentFile;
+    };
+    fileMgr.isCurrentFile = function(fileDesc) {
+        return fileDesc === currentFile;
+    };
+    fileMgr.setCurrentFile = function(fileDesc) {
+        currentFile = fileDesc;
+        if(fileDesc === undefined) {
+            localStorage.removeItem("file.current");
+        }
+        else if(fileDesc.fileIndex != TEMPORARY_FILE_INDEX) {
+            localStorage["file.current"] = fileDesc.fileIndex;
+        }
+    };
 
-	fileManager.deleteFile = function(fileIndex) {
-		fileIndex = fileIndex || fileManager.getCurrentFileIndex();
-		if(fileManager.isCurrentFileIndex(fileIndex)) {
-			// Unset the current fileIndex
-			fileManager.setCurrentFileIndex();
-		}
+    // Caution: this function recreates the editor (reset undo operations)
+    fileMgr.selectFile = function(fileDesc) {
+        fileDesc = fileDesc || fileMgr.getCurrentFile();
 
-		// Remove synchronized locations
-		var syncIndexList = _.compact(localStorage[fileIndex + ".sync"].split(";"));
-		_.each(syncIndexList, function(syncIndex) {
-			fileManager.removeSync(syncIndex);
-		});
-		localStorage.removeItem(fileIndex + ".sync");
-		
-		// Remove publish locations
-		var publishIndexList = _.compact(localStorage[fileIndex + ".publish"].split(";"));
-		_.each(publishIndexList, function(publishIndex) {
-			fileManager.removePublish(publishIndex);
-		});
-		localStorage.removeItem(fileIndex + ".publish");
+        if(fileDesc === undefined) {
+            var fileSystemSize = _.size(fileSystem);
+            // If fileSystem empty create one file
+            if(fileSystemSize === 0) {
+                fileDesc = fileMgr.createFile(WELCOME_DOCUMENT_TITLE, welcomeContent);
+            }
+            else {
+                var fileIndex = localStorage["file.current"];
+                // If no file is selected take the last created
+                if(fileIndex === undefined) {
+                    fileIndex = _.keys(fileSystem)[fileSystemSize - 1];
+                }
+                fileDesc = fileSystem[fileIndex];
+            }
+        }
 
-		localStorage["file.list"] = localStorage["file.list"].replace(";"
-			+ fileIndex + ";", ";");
-		localStorage.removeItem(fileIndex + ".title");
-		localStorage.removeItem(fileIndex + ".content");
-	};
+        if(fileMgr.isCurrentFile(fileDesc) === false) {
+            fileMgr.setCurrentFile(fileDesc);
 
-	fileManager.saveFile = function() {
-		var content = $("#wmd-input").val();
-		var fileIndex = fileManager.getCurrentFileIndex();
-		localStorage[fileIndex + ".content"] = content;
-		synchronizer.notifyChange(fileIndex);
-	};
-	
-	fileManager.updateFileTitles = function() {
-		$("#file-selector").empty();
-		fileDescList = _.chain(localStorage["file.list"].split(";")).compact()
-			.reduce(function(fileDescList, fileIndex) {
-				var title = localStorage[fileIndex + ".title"];
-				fileDescList.push({ index : fileIndex, title : title });
-				return fileDescList;
-			}, [])
-			.sortBy(function(fileDesc) {
-				return fileDesc.title.toLowerCase();
-			}).value();
+            // Notify extensions
+            extensionMgr.onFileSelected(fileDesc);
 
-		var fileIndex = fileManager.getCurrentFileIndex();
-		// If no default file take first one
-		if (fileIndex === undefined) {
-			fileIndex = fileDescList[0].index;
-			fileManager.setCurrentFileIndex(fileIndex);
-		}
-		
-		synchronizer.resetSyncFlags();
-		function composeTitle(fileIndex, refreshSharing) {
-			var result = [];
-			var syncAttributesList = synchronizer.getSyncAttributesFromFile(fileIndex);
-			var publishAttributesList = publisher.getPublishAttributesFromFile(fileIndex);
-			var attributesList = syncAttributesList.concat(publishAttributesList);
-			if(refreshSharing === true) {
-				sharing.refreshDocumentSharing(attributesList);
-			}
-			_.chain(attributesList).sortBy(function(attributes) {
-				return attributes.provider;
-			}).each(function(attributes) {
-				result.push('<i class="icon-' + attributes.provider + '"></i>');
-			});
-			result.push(" ");
-			result.push(localStorage[fileIndex + ".title"]);
-			return result.join("");
-		}
+            // Hide the viewer pencil button
+            if(fileDesc.fileIndex == TEMPORARY_FILE_INDEX) {
+                $(".action-edit-document").removeClass("hide");
+            }
+            else {
+                $(".action-edit-document").addClass("hide");
+            }
+        }
 
-		// Update the file title
-		var title = localStorage[fileIndex + ".title"];
-		document.title = "StackEdit - " + title;
-		$("#file-title").html(composeTitle(fileIndex, true));
-		$(".file-title").text(title);
-		$("#file-title-input").val(title);
-		
-		// Update the file selector
-		$("#file-selector").empty();
-		_.each(fileDescList, function(fileDesc) {
-			var a = $("<a>").html(composeTitle(fileDesc.index));
-			var li = $("<li>").append(a);
-			if (fileDesc.index == fileIndex) {
-				li.addClass("disabled");
-			} else {
-				a.prop("href", "#").click((function(fileIndex) {
-					return function() {
-						fileManager.selectFile(fileIndex);
-					};
-				})(fileDesc.index));
-			}
-			$("#file-selector").append(li);			
-		});
-		
-		core.layoutRefresh();
-	};
+        // Recreate the editor
+        $("#wmd-input").val(fileDesc.content);
+        core.createEditor(function() {
+            // Callback to save content when textarea changes
+            fileMgr.saveFile();
+        });
+    };
 
-	// Remove a syncIndex (synchronized location)
-	fileManager.removeSync = function(syncIndex) {
-		var fileIndex = fileManager.getFileIndexFromSync(syncIndex);
-		if(fileIndex !== undefined) {
-			localStorage[fileIndex + ".sync"] = localStorage[fileIndex + ".sync"].replace(";"
-				+ syncIndex + ";", ";");
-			if(fileManager.isCurrentFileIndex(fileIndex)) {
-				synchronizer.refreshManageSync();
-			}
-		}
-		// Remove sync attributes
-		localStorage.removeItem(syncIndex);
-	};
-	
-	// Get the fileIndex associated to a syncIndex
-	fileManager.getFileIndexFromSync = function(syncIndex) {
-		return _.chain(localStorage["file.list"].split(";")).compact()
-			.find(function(fileIndex) {
-				var sync = localStorage[fileIndex + ".sync"];
-				return sync.indexOf(";" + syncIndex + ";") !== -1;
-			}).value();
-	};
+    fileMgr.createFile = function(title, content, syncLocations, isTemporary) {
+        content = content !== undefined ? content : settings.defaultContent;
+        if(!title) {
+            // Create a file title
+            title = DEFAULT_FILE_TITLE;
+            var indicator = 2;
+            while (_.some(fileSystem, function(fileDesc) {
+                return fileDesc.title == title;
+            })) {
+                title = DEFAULT_FILE_TITLE + indicator++;
+            }
+        }
 
-	// Remove a publishIndex (publish location)
-	fileManager.removePublish = function(publishIndex) {
-		var fileIndex = fileManager.getFileIndexFromPublish(publishIndex);
-		if(fileIndex !== undefined) {
-			localStorage[fileIndex + ".publish"] = localStorage[fileIndex + ".publish"].replace(";"
-				+ publishIndex + ";", ";");
-			if(fileManager.isCurrentFileIndex(fileIndex)) {
-				publisher.notifyPublish();
-			}
-		}
-		// Remove publish attributes
-		localStorage.removeItem(publishIndex);
-	};
-	
-	// Get the fileIndex associated to a publishIndex
-	fileManager.getFileIndexFromPublish = function(publishIndex) {
-		return _.chain(localStorage["file.list"].split(";")).compact()
-			.find(function(fileIndex) {
-				var sync = localStorage[fileIndex + ".publish"];
-				return sync.indexOf(";" + publishIndex + ";") !== -1;
-			}).value();
-	};
-	
-	core.onReady(function() {
-		fileManager.selectFile();
+        // Generate a unique fileIndex
+        var fileIndex = TEMPORARY_FILE_INDEX;
+        if(!isTemporary) {
+            do {
+                fileIndex = "file." + utils.randomString();
+            } while (_.has(fileSystem, fileIndex));
+        }
 
-		$(".action-create-file").click(function() {
-			var fileIndex = fileManager.createFile();
-			fileManager.selectFile(fileIndex);
-			$("#file-title").click();
-		});
-		$(".action-remove-file").click(function() {
-			fileManager.deleteFile();
-			fileManager.selectFile();
-		});
-		$("#file-title").click(function() {
-			if(viewerMode === true) {
-				return;
-			}
-			$(this).hide();
-			$("#file-title-input").show().focus().get(0).select();
-		});
-		function applyTitle(input) {
-			var title = $.trim(input.val());
-			var fileIndexTitle = fileManager.getCurrentFileIndex() + ".title";
-			if (title) {
-				if (title != localStorage[fileIndexTitle]) {
-					localStorage[fileIndexTitle] = title;
-					fileManager.updateFileTitles();
-					fileManager.saveFile();
-				}
-			}
-			input.hide().val(localStorage[fileIndexTitle]);
-			$("#file-title").show();
-			core.layoutRefresh();
-		}
-		$("#file-title-input").blur(function() {
-			applyTitle($(this));
-		}).keyup(function(e) {
-			if (e.keyCode == 13) {
-				applyTitle($(this));
-			}
-			if (e.keyCode == 27) {
-				$(this).val("");
-				applyTitle($(this));
-			}
-		});
-		$(".action-open-stackedit").click(function() {
-			window.location.href = ".";
-		});
-		$(".action-edit-document").click(function() {
-			var content = $("#wmd-input").val();
-			var title = localStorage[fileManager.getCurrentFileIndex() + ".title"];
-			var fileIndex = fileManager.createFile(title, content);
-			fileManager.selectFile(fileIndex);
-			window.location.href = ".";
-		});
-		$(".action-download-md").click(function() {
-			var content = $("#wmd-input").val();
-			var title = localStorage[fileManager.getCurrentFileIndex() + ".title"];
-			core.saveFile(content, title + ".md");
-		});
-		$(".action-download-html").click(function() {
-			var content = $("#wmd-preview").html();
-			var title = localStorage[fileManager.getCurrentFileIndex() + ".title"];
-			core.saveFile(content, title + ".html");
-		});		
-		$(".action-download-template").click(function() {
-			var content = publisher.applyTemplate();
-			var title = localStorage[fileManager.getCurrentFileIndex() + ".title"];
-			core.saveFile(content, title + ".txt");
-		});
-		$(".action-welcome-file").click(function() {
-			var fileIndex = fileManager.createFile(WELCOME_DOCUMENT_TITLE, welcomeContent);
-			fileManager.selectFile(fileIndex);
-		});
-	});
+        // syncIndex associations
+        syncLocations = syncLocations || {};
+        var sync = _.reduce(syncLocations, function(sync, syncAttributes, syncIndex) {
+            return sync + syncIndex + ";";
+        }, ";");
 
-	core.setFileManager(fileManager);
-	return fileManager;
+        localStorage[fileIndex + ".title"] = title;
+        localStorage[fileIndex + ".content"] = content;
+        localStorage[fileIndex + ".sync"] = sync;
+        localStorage[fileIndex + ".publish"] = ";";
+
+        // Create the file descriptor
+        var fileDesc = new FileDescriptor(fileIndex, title, syncLocations);
+
+        // Add the index to the file list
+        if(!isTemporary) {
+            localStorage["file.list"] += fileIndex + ";";
+            fileSystem[fileIndex] = fileDesc;
+            extensionMgr.onFileCreated(fileDesc);
+        }
+        return fileDesc;
+    };
+
+    fileMgr.deleteFile = function(fileDesc) {
+        fileDesc = fileDesc || fileMgr.getCurrentFile();
+
+        // Remove the index from the file list
+        localStorage["file.list"] = localStorage["file.list"].replace(";" + fileDesc.fileIndex + ";", ";");
+        delete fileSystem[fileDesc.fileIndex];
+        
+        if(fileMgr.isCurrentFile(fileDesc) === true) {
+            // Unset the current fileDesc
+            fileMgr.setCurrentFile();
+            // Refresh the editor with an other file
+            fileMgr.selectFile();
+        }
+
+        // Remove synchronized locations
+        _.each(fileDesc.syncLocations, function(syncAttributes) {
+            fileMgr.removeSync(syncAttributes, true);
+        });
+
+        // Remove publish locations
+        _.each(fileDesc.publishLocations, function(publishAttributes) {
+            fileMgr.removePublish(publishAttributes, true);
+        });
+
+        localStorage.removeItem(fileDesc.fileIndex + ".title");
+        localStorage.removeItem(fileDesc.fileIndex + ".content");
+        localStorage.removeItem(fileDesc.fileIndex + ".sync");
+        localStorage.removeItem(fileDesc.fileIndex + ".publish");
+
+        extensionMgr.onFileDeleted(fileDesc);
+    };
+
+    // Save current file in localStorage
+    fileMgr.saveFile = function() {
+        var fileDesc = fileMgr.getCurrentFile();
+        fileDesc.content = $("#wmd-input").val();
+    };
+
+    // Add a synchronized location to a file
+    fileMgr.addSync = function(fileDesc, syncAttributes) {
+        localStorage[fileDesc.fileIndex + ".sync"] += syncAttributes.syncIndex + ";";
+        fileDesc.syncLocations[syncAttributes.syncIndex] = syncAttributes;
+        // addSync is only used for export, not for import
+        extensionMgr.onSyncExportSuccess(fileDesc, syncAttributes);
+    };
+
+    // Remove a synchronized location
+    fileMgr.removeSync = function(syncAttributes, skipExtensions) {
+        var fileDesc = fileMgr.getFileFromSyncIndex(syncAttributes.syncIndex);
+        if(fileDesc !== undefined) {
+            localStorage[fileDesc.fileIndex + ".sync"] = localStorage[fileDesc.fileIndex + ".sync"].replace(";" + syncAttributes.syncIndex + ";", ";");
+        }
+        // Remove sync attributes
+        localStorage.removeItem(syncAttributes.syncIndex);
+        delete fileDesc.syncLocations[syncAttributes.syncIndex];
+        if(!skipExtensions) {
+            extensionMgr.onSyncRemoved(fileDesc, syncAttributes);
+        }
+    };
+
+    // Get the file descriptor associated to a syncIndex
+    fileMgr.getFileFromSyncIndex = function(syncIndex) {
+        return _.find(fileSystem, function(fileDesc) {
+            return _.has(fileDesc.syncLocations, syncIndex);
+        });
+    };
+
+    // Get syncAttributes from syncIndex
+    fileMgr.getSyncAttributes = function(syncIndex) {
+        var fileDesc = fileMgr.getFileFromSyncIndex(syncIndex);
+        return fileDesc && fileDesc.syncLocations[syncIndex];
+    };
+
+    // Returns true if provider has locations to synchronize
+    fileMgr.hasSync = function(provider) {
+        return _.some(fileSystem, function(fileDesc) {
+            return _.some(fileDesc.syncLocations, function(syncAttributes) {
+                return syncAttributes.provider === provider;
+            });
+        });
+    };
+
+    // Add a publishIndex (publish location) to a file
+    fileMgr.addPublish = function(fileDesc, publishAttributes) {
+        localStorage[fileDesc.fileIndex + ".publish"] += publishAttributes.publishIndex + ";";
+        fileDesc.publishLocations[publishAttributes.publishIndex] = publishAttributes;
+        extensionMgr.onNewPublishSuccess(fileDesc, publishAttributes);
+    };
+
+    // Remove a publishIndex (publish location)
+    fileMgr.removePublish = function(publishAttributes, skipExtensions) {
+        var fileDesc = fileMgr.getFileFromPublishIndex(publishAttributes.publishIndex);
+        if(fileDesc !== undefined) {
+            localStorage[fileDesc.fileIndex + ".publish"] = localStorage[fileDesc.fileIndex + ".publish"].replace(";" + publishAttributes.publishIndex + ";", ";");
+        }
+        // Remove publish attributes
+        localStorage.removeItem(publishAttributes.publishIndex);
+        delete fileDesc.publishLocations[publishAttributes.publishIndex];
+        if(!skipExtensions) {
+            extensionMgr.onPublishRemoved(fileDesc, publishAttributes);
+        }
+    };
+
+    // Get the file descriptor associated to a publishIndex
+    fileMgr.getFileFromPublishIndex = function(publishIndex) {
+        return _.find(fileSystem, function(fileDesc) {
+            return _.has(fileDesc.publishLocations, publishIndex);
+        });
+    };
+
+    core.onReady(function() {
+
+        fileMgr.selectFile();
+
+        $(".action-create-file").click(function() {
+            var fileDesc = fileMgr.createFile();
+            fileMgr.selectFile(fileDesc);
+            var wmdInput = $("#wmd-input").focus().get(0);
+            if(wmdInput.setSelectionRange) {
+                wmdInput.setSelectionRange(0, 0);
+            }
+            $("#file-title").click();
+        });
+        $(".action-remove-file").click(function() {
+            fileMgr.deleteFile();
+        });
+        $("#file-title").click(function() {
+            if(viewerMode === true) {
+                return;
+            }
+            $(this).hide();
+            var fileTitleInput = $("#file-title-input").show();
+            _.defer(function() {
+                fileTitleInput.focus().get(0).select();
+            });
+        });
+        function applyTitle(input) {
+            input.hide();
+            $("#file-title").show();
+            var title = $.trim(input.val());
+            var fileDesc = fileMgr.getCurrentFile();
+            if(title && title != fileDesc.title) {
+                fileDesc.title = title;
+            }
+            input.val(fileDesc.title);
+            $("#wmd-input").focus();
+        }
+        $("#file-title-input").blur(function() {
+            applyTitle($(this));
+        }).keyup(function(e) {
+            if(e.keyCode == 13) {
+                applyTitle($(this));
+            }
+            if(e.keyCode == 27) {
+                $(this).val("");
+                applyTitle($(this));
+            }
+        });
+        $(".action-open-stackedit").click(function() {
+            window.location.href = ".";
+        });
+        $(".action-edit-document").click(function() {
+            var content = $("#wmd-input").val();
+            var title = fileMgr.getCurrentFile().title;
+            var fileDesc = fileMgr.createFile(title, content);
+            fileMgr.selectFile(fileDesc);
+            window.location.href = ".";
+        });
+        $(".action-welcome-file").click(function() {
+            var fileDesc = fileMgr.createFile(WELCOME_DOCUMENT_TITLE, welcomeContent);
+            fileMgr.selectFile(fileDesc);
+        });
+    });
+
+    extensionMgr.onFileMgrCreated(fileMgr);
+    return fileMgr;
 });
