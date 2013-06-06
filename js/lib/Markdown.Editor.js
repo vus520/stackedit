@@ -2045,20 +2045,19 @@
             chunk.skipLines(nLinesBack, nLinesForward);
 
             if (!chunk.selection) {
-                chunk.startTag = "    ";
+                chunk.startTag = "```java\n";
                 chunk.selection = this.getString("codeexample");
+                chunk.endTag = "\n```\n";
             }
             else {
-                if (/^[ ]{0,3}\S/m.test(chunk.selection)) {
-                    if (/\n/.test(chunk.selection))
-                        chunk.selection = chunk.selection.replace(/^/gm, "    ");
-                    else // if it's not multiline, do not select the four added spaces; this is more consistent with the doList behavior
-                        chunk.before += "    ";
+                if (/^```/m.test(chunk.selection)) {
                 }
                 else {
-                    chunk.selection = chunk.selection.replace(/^(?:[ ]{4}|[ ]{0,3}\t)/gm, "");
+                	chunk.startTag = "```java\n";
+                	chunk.endTag = "\n```\n";
                 }
             }
+            chunk.trimWhitespace();
         }
         else {
             // Use backticks (`) to delimit the code block.
