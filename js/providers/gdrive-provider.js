@@ -2,10 +2,11 @@ define([
     "underscore",
     "core",
     "utils",
+    "settings",
     "extension-manager",
     "file-manager",
-    "google-helper"
-], function(_, core, utils, extensionMgr, fileMgr, googleHelper) {
+    "helpers/google-helper"
+], function(_, core, utils, settings, extensionMgr, fileMgr, googleHelper) {
 
     var PROVIDER_GDRIVE = "gdrive";
 
@@ -61,19 +62,19 @@ define([
     ;
 
     gdriveProvider.importFiles = function() {
-        googleHelper.picker(function(error, ids) {
-            if(error || ids.length === 0) {
+        googleHelper.picker(function(error, docs) {
+            if(error || docs.length === 0) {
                 return;
             }
             var importIds = [];
-            _.each(ids, function(id) {
-                var syncIndex = createSyncIndex(id);
+            _.each(docs, function(doc) {
+                var syncIndex = createSyncIndex(doc.id);
                 var fileDesc = fileMgr.getFileFromSyncIndex(syncIndex);
                 if(fileDesc !== undefined) {
                     extensionMgr.onError('"' + fileDesc.title + '" was already imported.');
                     return;
                 }
-                importIds.push(id);
+                importIds.push(doc.id);
             });
             importFilesFromIds(importIds);
         });
@@ -243,14 +244,13 @@ define([
     };
 
     core.onReady(function() {
-        var state = localStorage[PROVIDER_GDRIVE + ".state"];
+        var state = utils.retrieveIgnoreError(PROVIDER_GDRIVE + ".state");
         if(state === undefined) {
             return;
         }
         localStorage.removeItem(PROVIDER_GDRIVE + ".state");
-        state = JSON.parse(state);
         if(state.action == "create") {
-            googleHelper.upload(undefined, state.folderId, GDRIVE_DEFAULT_FILE_TITLE, "", undefined, function(error, file) {
+            googleHelper.upload(undefined, state.folderId, GDRIVE_DEFAULT_FILE_TITLE, settings.defaultContent, undefined, function(error, file) {
                 if(error) {
                     return;
                 }

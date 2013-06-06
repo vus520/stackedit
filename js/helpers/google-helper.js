@@ -117,11 +117,11 @@ define([
             var headers = {
                 'Content-Type': 'multipart/mixed; boundary="' + boundary + '"',
             };
-            if(etag !== undefined) {
-                // Sometimes we have error 412 from Google even with the correct
-                // etag
-                // headers["If-Match"] = etag;
-            }
+            // Sometimes we have error 412 from Google even with the correct
+            // etag
+            // if(etag !== undefined) {
+            // headers["If-Match"] = etag;
+            // }
 
             var base64Data = utils.encodeBase64(content);
             var multipartRequestBody = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: ' + contentType + '\r\n' + 'Content-Transfer-Encoding: base64\r\n' + '\r\n' + base64Data + close_delim;
@@ -139,6 +139,7 @@ define([
                 if(response && response.id) {
                     // Upload success
                     result = response;
+                    result.content = content;
                     task.chain();
                     return;
                 }
@@ -361,7 +362,7 @@ define([
                     task.retry(new Error(errorMsg), 1);
                     return;
                 }
-                else if(error.code <= 0) {
+                else if(error.code === 0 || error.code === -1) {
                     connected = false;
                     authenticated = false;
                     core.setOffline();
@@ -401,8 +402,8 @@ define([
         });
     }
 
-    googleHelper.picker = function(callback) {
-        var ids = [];
+    googleHelper.picker = function(callback, isImagePicker) {
+        var docs = [];
         var picker = undefined;
         function hidePicker() {
             if(picker !== undefined) {
@@ -414,24 +415,23 @@ define([
         connect(task);
         loadPicker(task);
         task.onRun(function() {
-            var view = new google.picker.View(google.picker.ViewId.DOCS);
-            view.setMimeTypes("text/x-markdown,text/plain,application/octet-stream");
             var pickerBuilder = new google.picker.PickerBuilder();
-            pickerBuilder.enableFeature(google.picker.Feature.NAV_HIDDEN);
-            pickerBuilder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
             pickerBuilder.setAppId(GOOGLE_DRIVE_APP_ID);
-            var token = gapi.auth.getToken();
-            if(token) {
-                pickerBuilder.setOAuthToken(token.access_token);
+            if(!isImagePicker) {
+                var view = new google.picker.View(google.picker.ViewId.DOCS);
+                view.setMimeTypes("text/x-markdown,text/plain,application/octet-stream");
+                pickerBuilder.enableFeature(google.picker.Feature.NAV_HIDDEN);
+                pickerBuilder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
+                pickerBuilder.addView(view);
             }
-            pickerBuilder.addView(view);
-            pickerBuilder.addView(new google.picker.DocsUploadView());
+            else {
+                pickerBuilder.addView(google.picker.ViewId.PHOTOS);
+                pickerBuilder.addView(google.picker.ViewId.PHOTO_UPLOAD);
+            }
             pickerBuilder.setCallback(function(data) {
                 if(data.action == google.picker.Action.PICKED || data.action == google.picker.Action.CANCEL) {
                     if(data.action == google.picker.Action.PICKED) {
-                        for ( var i = 0; i < data.docs.length; i++) {
-                            ids.push(data.docs[i].id);
-                        }
+                        docs = data.docs;
                     }
                     hidePicker();
                     task.chain();
@@ -445,7 +445,7 @@ define([
             picker.setVisible(true);
         });
         task.onSuccess(function() {
-            callback(undefined, ids);
+            callback(undefined, docs);
         });
         task.onError(function(error) {
             hidePicker();
