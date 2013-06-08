@@ -1,10 +1,13 @@
 // Setup an empty localStorage or upgrade an existing one
 define([
-    "underscore",
-    "utils"
-], function(_, utils) {
+    "underscore"
+], function(_) {
 
-    var fileIndexList = utils.retrieveIndexArray("file.list");
+    // Create the file system if not exist
+    if(localStorage["file.list"] === undefined) {
+        localStorage["file.list"] = ";";
+    }
+    var fileIndexList = _.compact(localStorage["file.list"].split(";"));
 
     // localStorage versioning
     var version = localStorage["version"];
@@ -19,7 +22,7 @@ define([
 
         _.each(fileIndexList, function(fileIndex) {
             localStorage[fileIndex + ".publish"] = ";";
-            var syncIndexList = utils.retrieveIndexArray(fileIndex + ".sync");
+            var syncIndexList = _.compact(localStorage[fileIndex + ".sync"].split(";"));
             _.each(syncIndexList, function(syncIndex) {
                 localStorage[syncIndex + ".contentCRC"] = "0";
                 // We store title CRC only for Google Drive synchronization
@@ -49,7 +52,7 @@ define([
         var SYNC_PROVIDER_GDRIVE = "sync." + PROVIDER_GDRIVE + ".";
         var SYNC_PROVIDER_DROPBOX = "sync." + PROVIDER_DROPBOX + ".";
         _.each(fileIndexList, function(fileIndex) {
-            var syncIndexList = utils.retrieveIndexArray(fileIndex + ".sync");
+            var syncIndexList = _.compact(localStorage[fileIndex + ".sync"].split(";"));
             _.each(syncIndexList, function(syncIndex) {
                 var syncAttributes = {};
                 if(syncIndex.indexOf(SYNC_PROVIDER_GDRIVE) === 0) {
@@ -82,7 +85,7 @@ define([
                 localStorage.removeItem(fileIndex + ".title");
                 localStorage.removeItem(fileIndex + ".publish");
                 localStorage.removeItem(fileIndex + ".content");
-                utils.removeIndexFromArray("file.list", fileIndex);
+                localStorage["file.list"] = localStorage["file.list"].replace(";" + fileIndex + ";", ";");
             }
         });
         version = "v3";
@@ -107,7 +110,7 @@ define([
     // Upgrade from v5 to v6
     if(version == "v5") {
         _.each(fileIndexList, function(fileIndex) {
-            var publishIndexList = utils.retrieveIndexArray(fileIndex + ".publish");
+            var publishIndexList = _.compact(localStorage[fileIndex + ".publish"].split(";"));
             _.each(publishIndexList, function(publishIndex) {
                 var publishAttributes = JSON.parse(localStorage[publishIndex]);
                 if(publishAttributes.provider == "gdrive") {

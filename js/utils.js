@@ -1,7 +1,7 @@
 define([
     "jquery",
     "underscore",
-    "libs/FileSaver"
+    "lib/FileSaver"
 ], function($, _) {
 
     var utils = {};
@@ -71,23 +71,6 @@ define([
         }
         value = parseInt(value);
         if((value === NaN) || (min !== undefined && value < min) || (max !== undefined && value > max)) {
-            inputError(element, event);
-            return undefined;
-        }
-        return value;
-    };
-    
-    // Return input value and check that it's a valid RegExp
-    utils.getInputRegExpValue = function(element, event) {
-        element = jqElt(element);
-        var value = utils.getInputTextValue(element, event);
-        if(value === undefined) {
-            return undefined;
-        }
-        try {
-            new RegExp(value);
-        }
-        catch(e) {
             inputError(element, event);
             return undefined;
         }
@@ -196,7 +179,7 @@ define([
     };
     utils.updateCurrentTime();
 
-    // Serialize sync/publish attributes and store it in the localStorage
+    // Serialize sync/publish attributes and store it in the fileStorage
     utils.storeAttributes = function(attributes) {
         var storeIndex = attributes.syncIndex || attributes.publishIndex;
         // Don't store sync/publish index
@@ -205,38 +188,7 @@ define([
         attributes.provider = attributes.provider.providerId;
         localStorage[storeIndex] = JSON.stringify(attributes);
     };
-    
-    // Retrieve/parse an index array from localStorage
-    utils.retrieveIndexArray = function(storeIndex) {
-        try {
-            return _.compact(localStorage[storeIndex].split(";"));
-        }
-        catch(e) {
-            localStorage[storeIndex] = ";";
-            return [];
-        }
-    };
-    
-    // Append an index to an array in localStorage
-    utils.appendIndexToArray = function(storeIndex, index) {
-        localStorage[storeIndex] += index + ";";
-    };
-    
-    // Remove an index from an array in localStorage
-    utils.removeIndexFromArray = function(storeIndex, index) {
-        localStorage[storeIndex] = localStorage[storeIndex].replace(";" + index + ";", ";");
-    };
 
-    // Retrieve/parse an object from localStorage. Returns undefined if error.
-    utils.retrieveIgnoreError = function(storeIndex) {
-        try {
-            return JSON.parse(localStorage[storeIndex]);
-        }
-        catch(e) {
-            return undefined;
-        }
-    };
-    
     // Base64 conversion
     utils.encodeBase64 = function(str) {
         if(str.length === 0) {

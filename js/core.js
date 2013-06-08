@@ -6,9 +6,9 @@ define([
     "extension-manager",
     "storage",
     "config",
-    "libs/bootstrap",
-    "libs/layout",
-    "libs/Markdown.Editor"
+    "lib/bootstrap",
+    "lib/layout",
+    "lib/Markdown.Editor"
 ], function($, _, utils, settings, extensionMgr) {
 
     var core = {};
@@ -172,7 +172,7 @@ define([
         extensionMgr.onLayoutConfigure(layoutGlobalConfig);
         if(settings.layoutOrientation == "horizontal") {
             $(".ui-layout-south").remove();
-            $(".preview-container").html('<div id="wmd-preview" class="well"></div>');
+            $(".ui-layout-east").addClass("well").prop("id", "wmd-preview");
             layout = $('body').layout($.extend(layoutGlobalConfig, {
                 east__resizable: true,
                 east__size: .5,
@@ -181,7 +181,7 @@ define([
         }
         else if(settings.layoutOrientation == "vertical") {
             $(".ui-layout-east").remove();
-            $(".preview-container").html('<div id="wmd-preview" class="well"></div>');
+            $(".ui-layout-south").addClass("well").prop("id", "wmd-preview");
             layout = $('body').layout($.extend(layoutGlobalConfig, {
                 south__resizable: true,
                 south__size: .5,
@@ -199,78 +199,46 @@ define([
     };
 
     // Create the PageDown editor
-    var editor = undefined;
-    var fileDesc = undefined;
-    var documentContent = undefined;
-    var undoManager = undefined;
-    core.createEditor = function(fileDescParam) {
-        fileDesc = fileDescParam;
-        documentContent = undefined;
-        var initDocumentContent = fileDesc.content;
-        var editorElt = $("#wmd-input");
-        editorElt.val(initDocumentContent);
-        if(editor !== undefined) {
-            // If the editor is already created
-            undoManager.reinit(initDocumentContent, fileDesc.editorStart, fileDesc.editorEnd, fileDesc.editorScrollTop);
-            editor.refreshPreview();
-            return;
-        }
-        var previewContainerElt = $(".preview-container");
-        
-        // Store editor scrollTop on scroll event
-        editorElt.scroll(function() {
-            if(documentContent !== undefined) {
-                fileDesc.editorScrollTop = $(this).scrollTop();
-            }
-        });
-        // Store editor selection on change
-        editorElt.bind("keyup mouseup", function() {
-            if(documentContent !== undefined) {
-                fileDesc.editorStart = this.selectionStart;
-                fileDesc.editorEnd = this.selectionEnd;
-            }
-        });
-        // Store preview scrollTop on scroll event
-        previewContainerElt.scroll(function() {
-            if(documentContent !== undefined) {
-                fileDesc.previewScrollTop = $(this).scrollTop();
-            }
-        });
-        
-        // Create the converter and the editor 
+    var insertLinkCallback = undefined;
+    core.createEditor = function(onTextChange) {
         var converter = new Markdown.Converter();
-        editor = new Markdown.Editor(converter);
+        var editor = new Markdown.Editor(converter);
         // Custom insert link dialog
         editor.hooks.set("insertLinkDialog", function(callback) {
-            core.insertLinkCallback = callback;
+            insertLinkCallback = callback;
             utils.resetModalInputs();
             $("#modal-insert-link").modal();
+            _.defer(function() {
+                $("#input-insert-link").focus();
+            });
             return true;
         });
         // Custom insert image dialog
         editor.hooks.set("insertImageDialog", function(callback) {
-            core.insertLinkCallback = callback;
+            insertLinkCallback = callback;
             utils.resetModalInputs();
             $("#modal-insert-image").modal();
+            _.defer(function() {
+                $("#input-insert-image").focus();
+            });
             return true;
         });
 
+        var documentContent = undefined;
         function checkDocumentChanges() {
-            var newDocumentContent = editorElt.val();
+            var newDocumentContent = $("#wmd-input").val();
             if(documentContent !== undefined && documentContent != newDocumentContent) {
-                fileDesc.content = newDocumentContent;
+                onTextChange();
             }
             documentContent = newDocumentContent;
         }
-        var previewWrapper;
+        var previewWrapper = undefined;
         if(settings.lazyRendering === true) {
             previewWrapper = function(makePreview) {
                 var debouncedMakePreview = _.debounce(makePreview, 500);
                 return function() {
                     if(documentContent === undefined) {
                         makePreview();
-                        editorElt.scrollTop(fileDesc.editorScrollTop);
-                        previewContainerElt.scrollTop(fileDesc.previewScrollTop);
                     }
                     else {
                         debouncedMakePreview();
@@ -282,18 +250,18 @@ define([
         else {
             previewWrapper = function(makePreview) {
                 return function() {
-                    makePreview();
-                    if(documentContent === undefined) {
-                        previewContainerElt.scrollTop(fileDesc.previewScrollTop);
-                    }
                     checkDocumentChanges();
+                    makePreview();
                 };
             };
         }
-        extensionMgr.onEditorConfigure(editor);
         editor.hooks.chain("onPreviewRefresh", extensionMgr.onAsyncPreview);
-        undoManager = editor.run(previewWrapper);
-        undoManager.reinit(initDocumentContent, fileDesc.editorStart, fileDesc.editorEnd, fileDesc.editorScrollTop);
+        extensionMgr.onEditorConfigure(editor);
+
+        $("#wmd-input, #wmd-preview").scrollTop(0);
+        $("#wmd-button-bar").empty();
+        editor.run(previewWrapper);
+        firstChange = false;
 
         // Hide default buttons
         $(".wmd-button-row").addClass("btn-group").find("li:not(.wmd-spacer)").addClass("btn").css("left", 0).find("span").hide();
@@ -356,55 +324,21 @@ define([
             e.stopPropagation();
         });
 
-        var shownModalId = undefined;
-        $(".modal").on('shown', function(e) {
-            // Focus on the first input when modal opens
-            var modalId = $(this).attr("id");
-            if(shownModalId != modalId) {
-                // Hack to avoid conflict with tabs, collapse, tooltips events
-                shownModalId = modalId;
-                _.defer(function(elt) {
-                    elt.find("input:enabled:visible:first").focus();
-                }, $(this));
-            }
-        }).on('hidden', function() {
-            // Focus on the editor when modal is gone
-            var modalId = $(this).attr("id");
-            if(shownModalId == modalId && $(this).is(":hidden")) {
-                shownModalId = undefined;
-                _.defer(function() {
-                    $("#wmd-input").focus();
-                });
-            }
-        }).keyup(function(e) {
-            // Handle enter key in modals
-            if(e.which == 13 && !$(e.target).is("textarea")) {
-                $(this).find(".modal-footer a:last").click();
-            }
-        });
-
         // Click events on "insert link" and "insert image" dialog buttons
         $(".action-insert-link").click(function(e) {
             var value = utils.getInputTextValue($("#input-insert-link"), e);
             if(value !== undefined) {
-                core.insertLinkCallback(value);
-                core.insertLinkCallback = undefined;
+                insertLinkCallback(value);
             }
         });
         $(".action-insert-image").click(function(e) {
             var value = utils.getInputTextValue($("#input-insert-image"), e);
             if(value !== undefined) {
-                core.insertLinkCallback(value);
-                core.insertLinkCallback = undefined;
+                insertLinkCallback(value);
             }
         });
-        
-        // Hide events on "insert link" and "insert image" dialogs
-        $("#modal-insert-link, #modal-insert-image").on('hidden', function() {
-            if(core.insertLinkCallback !== undefined) {
-                core.insertLinkCallback(null);
-                core.insertLinkCallback = undefined;
-            }
+        $(".action-close-insert-link").click(function(e) {
+            insertLinkCallback(null);
         });
 
         // Settings loading/saving
@@ -440,7 +374,7 @@ define([
             "line-height": Math.round(settings.editorFontSize * (20 / 14)) + "px"
         });
 
-        // Handle tab key
+        // Manage tab key
         $("#wmd-input").keydown(function(e) {
             if(e.keyCode === 9) {
                 var value = $(this).val();
@@ -460,15 +394,13 @@ define([
         $(".tooltip-lazy-rendering").tooltip({
             container: '#modal-settings',
             placement: 'right',
-            trigger: 'hover',
-            title: 'Disable preview rendering while typing in order to offload CPU. Refresh preview after 500 ms of inactivity.'
+            title: '输入文字时实时预览会增加CPU的运算，延时预览默认为500ms.'
         });
         $(".tooltip-default-content").tooltip({
             html: true,
             container: '#modal-settings',
             placement: 'right',
-            trigger: 'hover',
-            title: 'Thanks for supporting StackEdit by adding a backlink in your documents!'
+            title: '发布文章时，默认会在文章尾部添加的内容'
         });
         $(".tooltip-template").tooltip({
             html: true,
@@ -494,13 +426,17 @@ define([
             ].join("")
         }).click(function(e) {
             $(this).tooltip('show');
-            $(document).on("click.tooltip-template", function(e) {
-                $(".tooltip-template").tooltip('hide');
-                $(document).off("click.tooltip-template");
-            });
             e.stopPropagation();
         });
 
+        $(document).click(function(e) {
+            $(".tooltip-template").tooltip('hide');
+        });
+        
+        $(".icon-fullscreen").click(function(){
+        	window.parent.fullscreen();
+        });
+        
         // Reset inputs
         $(".action-reset-input").click(function() {
             utils.resetModalInputs();

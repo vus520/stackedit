@@ -1,0 +1,124 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>eoe editor</title>
+<script src="js/lib/jquery.js"></script>
+<style>
+body {width:90%;margin-left:auto; margin-right:auto;}
+iframe {border: 0px;}
+.editor_box{
+	width:900px;
+	height:600px;
+}
+.fullscreen{
+	width: "1000px";
+	position: absolute; left: 0px; top: 0px;
+	z-index: 999999;
+}
+</style>
+<script>
+(function() {
+    var
+        fullScreenApi = {
+            supportsFullScreen: false,
+            isFullScreen: function() { return false; },
+            requestFullScreen: function() {},
+            cancelFullScreen: function() {},
+            fullScreenEventName: '',
+            prefix: ''
+        },
+        browserPrefixes = 'webkit moz o ms khtml'.split(' ');
+ 
+    // check for native support
+    if (typeof document.cancelFullScreen != 'undefined') {
+        fullScreenApi.supportsFullScreen = true;
+    } else {
+        // check for fullscreen support by vendor prefix
+        for (var i = 0, il = browserPrefixes.length; i < il; i++ ) {
+            fullScreenApi.prefix = browserPrefixes[i];
+ 
+            if (typeof document[fullScreenApi.prefix + 'CancelFullScreen' ] != 'undefined' ) {
+                fullScreenApi.supportsFullScreen = true;
+ 
+                break;
+            }
+        }
+    }
+ 
+    // update methods to do something useful
+    if (fullScreenApi.supportsFullScreen) {
+        fullScreenApi.fullScreenEventName = fullScreenApi.prefix + 'fullscreenchange';
+ 
+        fullScreenApi.isFullScreen = function() {
+            switch (this.prefix) {
+                case '':
+                    return document.fullScreen;
+                case 'webkit':
+                    return document.webkitIsFullScreen;
+                default:
+                    return document[this.prefix + 'FullScreen'];
+            }
+        }
+        fullScreenApi.requestFullScreen = function(el) {
+            return (this.prefix === '') ? el.requestFullScreen() : el[this.prefix + 'RequestFullScreen']();
+        }
+        fullScreenApi.cancelFullScreen = function(el) {
+            return (this.prefix === '') ? document.cancelFullScreen() : document[this.prefix + 'CancelFullScreen']();
+        }
+    }
+ 
+    // jQuery plugin
+    if (typeof jQuery != 'undefined') {
+        jQuery.fn.requestFullScreen = function() {
+ 
+            return this.each(function() {
+                if (fullScreenApi.supportsFullScreen) {
+                    fullScreenApi.requestFullScreen(this);
+                }
+            });
+        };
+    }
+
+    window.fullScreenApi = fullScreenApi;
+})();
+window.eoeditor = {isfullscreen:false};
+window.onresize = function(){
+	fullscreen();
+};
+function fullscreen(type){
+	if(type == 'fix'){
+		$('#editor').css("width", "100%").css("height", "100%");
+	}else{
+		if(eoeditor.isfullscreen == true){
+			var e = $.Event("keydown", {keyCode:27});
+			$("body").trigger(e);
+			$('#editor').removeClass('fullscreen');
+		}else{
+			if (window.fullScreenApi.supportsFullScreen) {
+				window.fullScreenApi.requestFullScreen($("#editor_box")[0]);
+			}
+			$('#editor').addClass('fullscreen');
+		}
+		eoeditor.isfullscreen = !eoeditor.isfullscreen;
+	}
+}
+</script>
+</head>
+<body scroll="no">
+<div class="editor_box" id="editor_box">
+<iframe id="editor" name="editor" frameborder="0" scrolling="auto" width="100%" height="100%" src="eoe.html?debug" allowFullScreen></iframe>
+</div>
+<div><textarea id="content" style="width:600px; height:100px;"></textarea></div>
+<div><input type="button" id="getcontent" value="getcontent"></div>
+<div><input type="button" id="toggleFullsreen" value="toggleFullsreen"></div>
+<script>
+$('input[id="getcontent"]').click(function(){
+	var val = window.frames[0].$("#wmd-input").val();
+	$('textarea[id="content"]').text(val);
+});
+$('input[id="toggleFullsreen"]').click(function(){
+	fullscreen();
+});
+</script>
+</body>
+</html>

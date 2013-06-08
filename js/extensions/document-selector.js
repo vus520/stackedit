@@ -7,11 +7,6 @@ define([
     var documentSelector = {
         extensionId: "documentSelector",
         extensionName: "Document selector",
-        /*
-        defaultConfig: {
-            keyShortcut: 223
-        },
-        */
         settingsBloc: '<p>Builds the "Open document" dropdown menu.</p>'
     };
 
@@ -61,8 +56,7 @@ define([
         $("#file-selector li:not(.stick)").removeClass("disabled");
         var li = liMap[fileDesc.fileIndex];
         if(li === undefined) {
-            // It means that we are showing a temporary file (not in the
-            // selector)
+            // It means that we are showing a temporary file (not in the selector)
             return;
         }
         liMap[fileDesc.fileIndex].addClass("disabled");
@@ -75,7 +69,7 @@ define([
     documentSelector.onSyncRemoved = buildSelector;
     documentSelector.onNewPublishSuccess = buildSelector;
     documentSelector.onPublishRemoved = buildSelector;
-
+    
     // Filter for search input in file selector
     function filterFileSelector(filter) {
         var liList = $("#file-selector li:not(.stick)");
@@ -100,22 +94,11 @@ define([
                 $("#file-search").val("").focus();
             });
         });
-        $("#file-search").keyup(function(e) {
-            if(e.which == 13 || e.which == 27) {
-                $(this).parent().click();
-            }
-            else {
-                filterFileSelector($(this).val());
-            }
+        $("#file-search").keyup(function() {
+            filterFileSelector($(this).val());
         }).click(function(event) {
             event.stopPropagation();
         });
-        /*
-        $("#wmd-input").keydown(function(event) {
-            if(event.ctrlKey && event.keyCode == documentSelector.config.keyShortcut) {
-                console.log(event.keyCode);
-            }
-        });*/
     };
 
     return documentSelector;

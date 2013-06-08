@@ -18,8 +18,7 @@ define([
     "extensions/math-jax",
     "extensions/email-converter",
     "extensions/scroll-link",
-    "libs/bootstrap",
-    "libs/jquery.waitforimages"
+    "lib/bootstrap"
 ], function($, _, utils, settings) {
 
     var extensionMgr = {};
@@ -90,7 +89,6 @@ define([
     addHook("onFileMgrCreated");
     addHook("onSynchronizerCreated");
     addHook("onPublisherCreated");
-    addHook("onExtensionMgrCreated");
 
     // Operations on files
     addHook("onFileCreated");
@@ -121,22 +119,22 @@ define([
 
     var onPreviewFinished = createHook("onPreviewFinished");
     var onAsyncPreviewCallbackList = getExtensionCallbackList("onAsyncPreview");
-    // The number of times we expect tryFinished to be called
-    var nbAsyncPreviewCallback = onAsyncPreviewCallbackList.length + 1;
     extensionMgr["onAsyncPreview"] = function() {
         logger.debug("onAsyncPreview");
         // Call onPreviewFinished callbacks when all async preview are finished
         var counter = 0;
         function tryFinished() {
-            if(++counter === nbAsyncPreviewCallback) {
+            if(counter === onAsyncPreviewCallbackList.length) {
                 onPreviewFinished();
             }
         }
-        // We assume images are loading in the preview
-        $("#wmd-preview").waitForImages(tryFinished);
         _.each(onAsyncPreviewCallbackList, function(asyncPreviewCallback) {
-            asyncPreviewCallback(tryFinished);
+            asyncPreviewCallback(function() {
+                counter++;
+                tryFinished();
+            });
         });
+        tryFinished();
     };
 
     var accordionTmpl = [
@@ -179,7 +177,5 @@ define([
 
     });
 
-    // For extensions that need to call other extensions
-    extensionMgr.onExtensionMgrCreated(extensionMgr);
     return extensionMgr;
 });

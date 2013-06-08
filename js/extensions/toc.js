@@ -8,29 +8,8 @@ define([
         extensionId: "toc",
         extensionName: "Table of content",
         optional: true,
-        defaultConfig: {
-            marker: "\\[(TOC|toc)\\]"
-        },
-        settingsBloc: [
-            '<p>Generates a table of content when a [TOC] marker is found.</p>',
-            '<div class="form-horizontal">',
-            '   <div class="control-group">',
-            '       <label class="control-label" for="input-toc-marker">Marker RegExp</label>',
-            '       <div class="controls">',
-            '           <input type="text" id="input-toc-marker" class="span2">',
-            '       </div>',
-            '   </div>',
-            '</div>'
-        ].join("")
+        settingsBloc: '<p>Generates a table of content when a [TOC] marker is found.</p>'
     };
-
-    toc.onLoadSettings = function() {
-        utils.setInputValue("#input-toc-marker", toc.config.marker);
-    };
-
-    toc.onSaveSettings = function(newConfig, event) {
-        newConfig.marker = utils.getInputRegExpValue("#input-toc-marker", event);
-};
 
     // TOC element description
     function TocElement(tagName, anchor, text) {
@@ -118,9 +97,9 @@ define([
     toc.onEditorConfigure = function(editor) {
         // Run TOC generation when conversion is finished directly on HTML
         editor.hooks.chain("onPreviewRefresh", function() {
-            var htmlToc = buildToc();
+            var toc = buildToc();
             var html = $("#wmd-preview").html();
-            html = html.replace(new RegExp("<p>" + toc.config.marker + "<\\/p>", "g"), htmlToc);
+            html = html.replace(/<p>\[TOC\]<\/p>/g, toc);
             $("#wmd-preview").html(html);
         });
     };

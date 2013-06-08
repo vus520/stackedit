@@ -32,6 +32,7 @@
                 <li><div id="wmd-button-bar"></div></li>
             </ul>
             <ul class="nav pull-right hide" id="menu-bar">
+            	<li class="wmd-button btn" id="fullscreen" style="left: 0px;" title="全屏 F11"><lable><i class="icon-fullscreen"></i></lable></li>
                 <li class="btn-group">
                 	<button class="btn dropdown-toggle" data-toggle="dropdown" title="Menu">
                         <i class="icon-stackedit"></i>&nbsp;&nbsp;<b class="caret"></b>
@@ -152,39 +153,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="tab-pane" id="tabpane-settings-publish">
-                    <div class="form-horizontal">
-                        <div class="control-group">
-                            <label class="control-label"
-                                for="input-settings-publish-commit-msg">发表注释</label>
-                            <div class="controls">
-                                <input type="text" id="input-settings-publish-commit-msg">
-                            </div>
-                        </div>
-                        <div class="control-group">
-                            <label class="control-label"
-                                for="textarea-settings-publish-template">模板 <a
-                                href="#" class="tooltip-template">(?)</a>
-                            </label>
-                            <div class="controls">
-                                <textarea id="textarea-settings-publish-template"></textarea>
-                            </div>
-                        </div>
-                        <div class="control-group">
-                            <label class="control-label" for="input-settings-ssh-proxy">SSH
-                                proxy</label>
-                            <div class="controls">
-                                <input type="text" id="input-settings-ssh-proxy">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="tab-pane" id="tabpane-settings-extensions">
-                    <div class="accordion" id="accordion-extensions"></div>
-                    <span class="help-block pull-right"><a target="_blank"
-                        href="https://github.com/benweet/stackedit/blob/master/doc/developer-guide.md#architecture">Create
-                            your own extension...</a></span>
-                </div>
+
                 <div class="tab-pane" id="tabpane-settings-utils">
                     <div style="width: 200px; margin: 10px auto;">
                         <a href="#" class="btn btn-block btn-primary action-welcome-file"

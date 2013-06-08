@@ -8,14 +8,14 @@ define([
     "file-system",
     "file-manager",
     "sharing",
-    "providers/blogger-provider",
-    "providers/dropbox-provider",
-    "providers/gist-provider",
-    "providers/github-provider",
-    "providers/gdrive-provider",
-    "providers/ssh-provider",
-    "providers/tumblr-provider",
-    "providers/wordpress-provider"
+    "blogger-provider",
+    "dropbox-provider",
+    "gist-provider",
+    "github-provider",
+    "gdrive-provider",
+    "ssh-provider",
+    "tumblr-provider",
+    "wordpress-provider"
 ], function($, _, core, utils, settings, extensionMgr, fileSystem, fileMgr, sharing) {
 
     var publisher = {};
@@ -30,22 +30,13 @@ define([
 
     // Retrieve publish locations from localStorage
     _.each(fileSystem, function(fileDesc) {
-        _.each(utils.retrieveIndexArray(fileDesc.fileIndex + ".publish"), function(publishIndex) {
-            try {
-                var publishAttributes = JSON.parse(localStorage[publishIndex]);
-                // Store publishIndex
-                publishAttributes.publishIndex = publishIndex;
-                // Replace provider ID by provider module in attributes
-                publishAttributes.provider = providerMap[publishAttributes.provider];
-                fileDesc.publishLocations[publishIndex] = publishAttributes;
-            }
-            catch(e) {
-                // localStorage can be corrupted
-                extensionMgr.onError(e);
-                // Remove publish location
-                utils.removeIndexFromArray(fileDesc.fileIndex + ".publish", publishIndex);
-                localStorage.removeItem(publishIndex);
-            }
+        _.chain(localStorage[fileDesc.fileIndex + ".publish"].split(";")).compact().each(function(publishIndex) {
+            var publishAttributes = JSON.parse(localStorage[publishIndex]);
+            // Store publishIndex
+            publishAttributes.publishIndex = publishIndex;
+            // Replace provider ID by provider module in attributes
+            publishAttributes.provider = providerMap[publishAttributes.provider];
+            fileDesc.publishLocations[publishIndex] = publishAttributes;
         });
     });
 
@@ -160,8 +151,9 @@ define([
         $("input:radio[name=radio-publish-format][value=" + defaultPublishFormat + "]").prop("checked", true);
 
         // Load preferences
-        var publishPreferences = utils.retrieveIgnoreError(provider.providerId + ".publishPreferences");
-        if(publishPreferences) {
+        var serializedPreferences = localStorage[provider.providerId + ".publishPreferences"];
+        if(serializedPreferences) {
+            var publishPreferences = JSON.parse(serializedPreferences);
             _.each(provider.publishPreferencesInputIds, function(inputId) {
                 utils.setInputValue("#input-publish-" + inputId, publishPreferences[inputId]);
             });
@@ -202,6 +194,18 @@ define([
         publishPreferences.format = publishAttributes.format;
         localStorage[provider.providerId + ".publishPreferences"] = JSON.stringify(publishPreferences);
     }
+
+    // Retrieve file's publish locations from localStorage
+    publisher.populatePublishLocations = function(fileDesc) {
+        _.chain(localStorage[fileDesc.fileIndex + ".publish"].split(";")).compact().each(function(publishIndex) {
+            var publishAttributes = JSON.parse(localStorage[publishIndex]);
+            // Store publishIndex
+            publishAttributes.publishIndex = publishIndex;
+            // Replace provider ID by provider module in attributes
+            publishAttributes.provider = providerMap[publishAttributes.provider];
+            fileDesc.publishLocations[publishIndex] = publishAttributes;
+        });
+    };
 
     core.onReady(function() {
         // Add every provider

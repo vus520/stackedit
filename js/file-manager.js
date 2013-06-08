@@ -5,22 +5,15 @@ define([
     "utils",
     "settings",
     "extension-manager",
-    "file-system",
-    "libs/text!../WELCOME.md"
+    "file-system"
 ], function($, _, core, utils, settings, extensionMgr, fileSystem, welcomeContent) {
 
     var fileMgr = {};
 
-    // Defines a file descriptor (fileDesc objects)
+    // Defines a file descriptor in the file system (fileDesc objects)
     function FileDescriptor(fileIndex, title, syncLocations, publishLocations) {
         this.fileIndex = fileIndex;
         this._title = title;
-        this._editorScrollTop = parseInt(localStorage[fileIndex + ".editorScrollTop"]) || 0;
-        this._editorStart = parseInt(localStorage[fileIndex + ".editorStart"]) || 0;
-        this._editorEnd = parseInt(localStorage[fileIndex + ".editorEnd"]) || 0;
-        this._previewScrollTop = parseInt(localStorage[fileIndex + ".previewScrollTop"]) || 0;
-        this.syncLocations = syncLocations || {};
-        this.publishLocations = publishLocations || {};
         this.__defineGetter__("title", function() {
             return this._title;
         });
@@ -36,38 +29,12 @@ define([
             localStorage[this.fileIndex + ".content"] = content;
             extensionMgr.onContentChanged(this);
         });
-        this.__defineGetter__("editorScrollTop", function() {
-            return this._editorScrollTop;
-        });
-        this.__defineSetter__("editorScrollTop", function(editorScrollTop) {
-            this._editorScrollTop = editorScrollTop;
-            localStorage[this.fileIndex + ".editorScrollTop"] = editorScrollTop;
-        });
-        this.__defineGetter__("editorStart", function() {
-            return this._editorStart;
-        });
-        this.__defineSetter__("editorStart", function(editorStart) {
-            this._editorStart = editorStart;
-            localStorage[this.fileIndex + ".editorStart"] = editorStart;
-        });
-        this.__defineGetter__("editorEnd", function() {
-            return this._editorEnd;
-        });
-        this.__defineSetter__("editorEnd", function(editorEnd) {
-            this._editorEnd = editorEnd;
-            localStorage[this.fileIndex + ".editorEnd"] = editorEnd;
-        });
-        this.__defineGetter__("previewScrollTop", function() {
-            return this._previewScrollTop;
-        });
-        this.__defineSetter__("previewScrollTop", function(previewScrollTop) {
-            this._previewScrollTop = previewScrollTop;
-            localStorage[this.fileIndex + ".previewScrollTop"] = previewScrollTop;
-        });
+        this.syncLocations = syncLocations || {};
+        this.publishLocations = publishLocations || {};
     }
 
-    // Retrieve file descriptors from localStorage and populate fileSystem
-    _.each(utils.retrieveIndexArray("file.list"), function(fileIndex) {
+    // Load file descriptors from localStorage
+    _.chain(localStorage["file.list"].split(";")).compact().each(function(fileIndex) {
         fileSystem[fileIndex] = new FileDescriptor(fileIndex, localStorage[fileIndex + ".title"]);
     });
 
@@ -89,6 +56,7 @@ define([
         }
     };
 
+    // Caution: this function recreates the editor (reset undo operations)
     fileMgr.selectFile = function(fileDesc) {
         fileDesc = fileDesc || fileMgr.getCurrentFile();
 
@@ -123,8 +91,12 @@ define([
             }
         }
 
-        // Refresh the editor
-        core.createEditor(fileDesc);
+        // Recreate the editor
+        $("#wmd-input").val(fileDesc.content);
+        core.createEditor(function() {
+            // Callback to save content when textarea changes
+            fileMgr.saveFile();
+        });
     };
 
     fileMgr.createFile = function(title, content, syncLocations, isTemporary) {
@@ -164,7 +136,7 @@ define([
 
         // Add the index to the file list
         if(!isTemporary) {
-            utils.appendIndexToArray("file.list", fileIndex);
+            localStorage["file.list"] += fileIndex + ";";
             fileSystem[fileIndex] = fileDesc;
             extensionMgr.onFileCreated(fileDesc);
         }
@@ -175,7 +147,7 @@ define([
         fileDesc = fileDesc || fileMgr.getCurrentFile();
 
         // Remove the index from the file list
-        utils.removeIndexFromArray("file.list", fileDesc.fileIndex);
+        localStorage["file.list"] = localStorage["file.list"].replace(";" + fileDesc.fileIndex + ";", ";");
         delete fileSystem[fileDesc.fileIndex];
         
         if(fileMgr.isCurrentFile(fileDesc) === true) {
@@ -187,12 +159,12 @@ define([
 
         // Remove synchronized locations
         _.each(fileDesc.syncLocations, function(syncAttributes) {
-            fileMgr.removeSync(syncAttributes);
+            fileMgr.removeSync(syncAttributes, true);
         });
 
         // Remove publish locations
         _.each(fileDesc.publishLocations, function(publishAttributes) {
-            fileMgr.removePublish(publishAttributes);
+            fileMgr.removePublish(publishAttributes, true);
         });
 
         localStorage.removeItem(fileDesc.fileIndex + ".title");
@@ -203,24 +175,32 @@ define([
         extensionMgr.onFileDeleted(fileDesc);
     };
 
+    // Save current file in localStorage
+    fileMgr.saveFile = function() {
+        var fileDesc = fileMgr.getCurrentFile();
+        fileDesc.content = $("#wmd-input").val();
+    };
+
     // Add a synchronized location to a file
     fileMgr.addSync = function(fileDesc, syncAttributes) {
-        utils.appendIndexToArray(fileDesc.fileIndex + ".sync", syncAttributes.syncIndex);
+        localStorage[fileDesc.fileIndex + ".sync"] += syncAttributes.syncIndex + ";";
         fileDesc.syncLocations[syncAttributes.syncIndex] = syncAttributes;
         // addSync is only used for export, not for import
         extensionMgr.onSyncExportSuccess(fileDesc, syncAttributes);
     };
 
     // Remove a synchronized location
-    fileMgr.removeSync = function(syncAttributes) {
+    fileMgr.removeSync = function(syncAttributes, skipExtensions) {
         var fileDesc = fileMgr.getFileFromSyncIndex(syncAttributes.syncIndex);
         if(fileDesc !== undefined) {
-            utils.removeIndexFromArray(fileDesc.fileIndex + ".sync", syncAttributes.syncIndex);
-            delete fileDesc.syncLocations[syncAttributes.syncIndex];
+            localStorage[fileDesc.fileIndex + ".sync"] = localStorage[fileDesc.fileIndex + ".sync"].replace(";" + syncAttributes.syncIndex + ";", ";");
+        }
+        // Remove sync attributes
+        localStorage.removeItem(syncAttributes.syncIndex);
+        delete fileDesc.syncLocations[syncAttributes.syncIndex];
+        if(!skipExtensions) {
             extensionMgr.onSyncRemoved(fileDesc, syncAttributes);
         }
-        // Remove sync attributes from localStorage
-        localStorage.removeItem(syncAttributes.syncIndex);
     };
 
     // Get the file descriptor associated to a syncIndex
@@ -247,21 +227,23 @@ define([
 
     // Add a publishIndex (publish location) to a file
     fileMgr.addPublish = function(fileDesc, publishAttributes) {
-        utils.appendIndexToArray(fileDesc.fileIndex + ".publish", publishAttributes.publishIndex);
+        localStorage[fileDesc.fileIndex + ".publish"] += publishAttributes.publishIndex + ";";
         fileDesc.publishLocations[publishAttributes.publishIndex] = publishAttributes;
         extensionMgr.onNewPublishSuccess(fileDesc, publishAttributes);
     };
 
     // Remove a publishIndex (publish location)
-    fileMgr.removePublish = function(publishAttributes) {
+    fileMgr.removePublish = function(publishAttributes, skipExtensions) {
         var fileDesc = fileMgr.getFileFromPublishIndex(publishAttributes.publishIndex);
         if(fileDesc !== undefined) {
-            utils.removeIndexFromArray(fileDesc.fileIndex + ".publish", publishAttributes.publishIndex);
-            delete fileDesc.publishLocations[publishAttributes.publishIndex];
+            localStorage[fileDesc.fileIndex + ".publish"] = localStorage[fileDesc.fileIndex + ".publish"].replace(";" + publishAttributes.publishIndex + ";", ";");
+        }
+        // Remove publish attributes
+        localStorage.removeItem(publishAttributes.publishIndex);
+        delete fileDesc.publishLocations[publishAttributes.publishIndex];
+        if(!skipExtensions) {
             extensionMgr.onPublishRemoved(fileDesc, publishAttributes);
         }
-        // Remove publish attributes from localStorage
-        localStorage.removeItem(publishAttributes.publishIndex);
     };
 
     // Get the file descriptor associated to a publishIndex

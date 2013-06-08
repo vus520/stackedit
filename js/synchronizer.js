@@ -6,8 +6,8 @@ define([
     "extension-manager",
     "file-system",
     "file-manager",
-    "providers/dropbox-provider",
-    "providers/gdrive-provider"
+    "dropbox-provider",
+    "gdrive-provider"
 ], function($, _, core, utils, extensionMgr, fileSystem, fileMgr) {
 
     var synchronizer = {};
@@ -22,22 +22,13 @@ define([
 
     // Retrieve sync locations from localStorage
     _.each(fileSystem, function(fileDesc) {
-        _.each(utils.retrieveIndexArray(fileDesc.fileIndex + ".sync"), function(syncIndex) {
-            try {
-                var syncAttributes = JSON.parse(localStorage[syncIndex]);
-                // Store syncIndex
-                syncAttributes.syncIndex = syncIndex;
-                // Replace provider ID by provider module in attributes
-                syncAttributes.provider = providerMap[syncAttributes.provider];
-                fileDesc.syncLocations[syncIndex] = syncAttributes;
-            }
-            catch(e) {
-                // localStorage can be corrupted
-                extensionMgr.onError(e);
-                // Remove sync location
-                utils.removeIndexFromArray(fileDesc.fileIndex + ".sync", syncIndex);
-                localStorage.removeItem(syncIndex);
-            }
+        _.chain(localStorage[fileDesc.fileIndex + ".sync"].split(";")).compact().each(function(syncIndex) {
+            var syncAttributes = JSON.parse(localStorage[syncIndex]);
+            // Store syncIndex
+            syncAttributes.syncIndex = syncIndex;
+            // Replace provider ID by provider module in attributes
+            syncAttributes.provider = providerMap[syncAttributes.provider];
+            fileDesc.syncLocations[syncIndex] = syncAttributes;
         });
     });
 
@@ -151,6 +142,7 @@ define([
         providerList = _.values(providerMap);
         providerDown(callback);
     }
+    ;
 
     // Main entry point for synchronization
     var syncRunning = false;
@@ -200,8 +192,9 @@ define([
         utils.resetModalInputs();
 
         // Load preferences
-        var exportPreferences = utils.retrieveIgnoreError(provider.providerId + ".exportPreferences");
-        if(exportPreferences) {
+        var serializedPreferences = localStorage[provider.providerId + ".exportPreferences"];
+        if(serializedPreferences) {
+            var exportPreferences = JSON.parse(serializedPreferences);
             _.each(provider.exportPreferencesInputIds, function(inputId) {
                 utils.setInputValue("#input-sync-export-" + inputId, exportPreferences[inputId]);
             });

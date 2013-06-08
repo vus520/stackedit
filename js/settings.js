@@ -2,22 +2,19 @@ define([
     "underscore",
     "config"
 ], function(_) {
-
+	var date = new Date();
+	var month = date.getMonth() + 1;
     var settings = {
         layoutOrientation: "horizontal",
         lazyRendering: true,
         editorFontSize: 14,
-        defaultContent: "\n\n\n> Written with [StackEdit](" + MAIN_URL + ").",
-        commitMsg: "Published with " + MAIN_URL,
+        defaultContent: "\n\n> "+date.getFullYear()+"年"+ month +"月"+date.getDay()+"日.",
+        commitMsg: "Published by http://benweet.github.io/stackedit",
         template: [
             '<!DOCTYPE html>\n',
             '<html>\n',
             '<head>\n',
-            '<meta charset="utf-8">\n',
             '<title><%= documentTitle %></title>\n',
-            '<link rel="stylesheet" href="',
-            MAIN_URL,
-            'css/main-min.css" />\n',
             '</head>\n',
             '<body><%= documentHTML %></body>\n',
             '</html>'
@@ -26,11 +23,8 @@ define([
         extensionSettings: {}
     };
 
-    try {
+    if(_.has(localStorage, "settings")) {
         _.extend(settings, JSON.parse(localStorage.settings));
-    }
-    catch(e) {
-        // Ignore parsing error
     }
 
     return settings;
